@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  antigravity:
+    # ⚠️ 请确保使用你构建出的正确镜像 tag
+    # 如果你在本地构建，可能是 antigravity-manager:latest
+    # 如果从 GitHub 拉取，可能是 ghcr.io/jjhuang01/antigravity-manager:latest
+    image: antigravity-manager:latest 
+    container_name: ag-manager
+    restart: unless-stopped
+    
+    # [网络模式]
+    # 推荐使用 host 模式，这样你的 Antigravity IDE 插件可以直接连接 localhost:8045
+    # 注意：Host 模式在 Linux 下生效，在 Mac/Windows Docker Desktop 下可能行为不同（需用端口映射）
+    network_mode: host
+    
+    # 如果不使用 host 模式，请解开下面的端口映射
+    # ports:
+    #   - "8045:8045"
+    
+    environment:
+      # [基础配置]
+      - RUST_LOG=info
+      - PORT=8045
+      
+      # [关键] 强制指定前端静态资源路径 (适配 Headless 模式)
+      - ABV_DIST_PATH=/app/dist
+      
+      # [安全配置 - 推荐设置]
+      # 设置后，无需手动去改 config.json，且容器重建后配置依然生效
+      # 生成 Key: uuidgen 或 openssl rand -hex 16
+      - ABV_API_KEY=sk-replace-with-your-secure-key
+      
+      # 设置 Web 管理后台的登录密码
+      - ABV_WEB_PASSWORD=replace-with-your-password
+
+      # [网络代理 - 可选]
+      # 如果你需要连接宿主机上的代理 (比如用户 jay 运行在 7890 端口)
+      # 必须确保 network_mode: host，然后解开注释：
+      # - http_proxy=http://127.0.0.1:7890
+      # - https_proxy=http://127.0.0.1:7890
+      # - all_proxy=socks5://127.0.0.1:7890
+
+    volumes:
+      # [持久化 - 数据] 
+      # 存放 accounts.json, device profiles, token database
+      # 确保 ./data/local-share 目录存在且有写入权限
+      - ./data/local-share:/root/.local/share/antigravity-tools
+      
+      # [持久化 - 配置]
+      # 存放 config.json
+      - ./data/config:/root/.config/antigravity-tools
+      
+      # [持久化 - 缓存/日志]
+      - ./data/cache:/root/.cache/antigravity-tools
+
+    # [健康检查]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8045/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    # [资源限制]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
